@@ -7,8 +7,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'FeedMe - Internal Feedback Platform',
+  description: 'Share feedback on meetings, orders, and tours to help us improve',
   generator: 'v0.app',
   icons: {
     icon: [
