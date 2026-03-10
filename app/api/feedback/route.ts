@@ -1,25 +1,21 @@
 import { NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { neon } from "@neondatabase/serverless"
+
+// Use the direct Postgres URL to bypass PostgREST schema cache issues
+const sql = neon(process.env.POSTGRES_URL!)
 
 export async function GET() {
   try {
-    const supabase = createAdminClient()
-    
-    const { data, error } = await supabase
-      .from("feedback")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(9)
+    const feedback = await sql`
+      SELECT * FROM feedback
+      ORDER BY created_at DESC
+      LIMIT 9
+    `
 
-    if (error) {
-      console.error("Error fetching feedback:", error)
-      return NextResponse.json({ error: "Failed to fetch feedback" }, { status: 500 })
-    }
-
-    return NextResponse.json({ feedback: data })
+    return NextResponse.json({ feedback })
   } catch (error) {
-    console.error("Error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Error fetching feedback:", error)
+    return NextResponse.json({ error: "Failed to fetch feedback" }, { status: 500 })
   }
 }
 
@@ -43,30 +39,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Rating must be between 1 and 5" }, { status: 400 })
     }
 
-    const supabase = createAdminClient()
+    const result = await sql`
+      INSERT INTO feedback (feedback_type, reference_id, rating, title, description, submitter_name, submitter_email)
+      VALUES (${feedbackType}, ${referenceId}, ${rating}, ${title}, ${description}, ${submitterName || null}, ${submitterEmail || null})
+      RETURNING *
+    `
 
-    const { data, error } = await supabase
-      .from("feedback")
-      .insert({
-        feedback_type: feedbackType,
-        reference_id: referenceId,
-        rating,
-        title,
-        description,
-        submitter_name: submitterName || null,
-        submitter_email: submitterEmail || null,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error("Error inserting feedback:", error)
-      return NextResponse.json({ error: "Failed to submit feedback" }, { status: 500 })
-    }
-
-    return NextResponse.json({ success: true, feedback: data }, { status: 201 })
+    return NextResponse.json({ success: true, feedback: result[0] }, { status: 201 })
   } catch (error) {
-    console.error("Error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Error inserting feedback:", error)
+    return NextResponse.json({ error: "Failed to submit feedback" }, { status: 500 })
   }
 }
