@@ -1,31 +1,46 @@
--- Create feedback table for FeedMe application
--- Supports three feedback types: meeting, order, tour
+-- ============================================
+-- FeedMe - Internal Feedback Platform
+-- MySQL Database Schema
+-- ============================================
 
-CREATE TABLE IF NOT EXISTS public.feedback (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  feedback_type TEXT NOT NULL CHECK (feedback_type IN ('meeting', 'order', 'tour')),
-  reference_id TEXT NOT NULL,
-  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
-  title TEXT NOT NULL,
-  description TEXT,
-  submitter_name TEXT NOT NULL,
-  submitter_email TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE DATABASE IF NOT EXISTS feedme;
+USE feedme;
+
+-- Main feedback table (handles all 3 types)
+CREATE TABLE feedback (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  type            ENUM('meeting', 'order', 'tour') NOT NULL,
+  reference       VARCHAR(255),          -- Meeting ID / Order number / Tour ID
+  rating          TINYINT CHECK (rating BETWEEN 1 AND 5),
+  title           VARCHAR(255),
+  description     TEXT,
+  name            VARCHAR(255),          -- Optional contact name
+  email           VARCHAR(255),          -- Optional contact email
+  submitted_at    DATETIME DEFAULT NOW()
 );
 
--- Enable Row Level Security
-ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
+-- ============================================
+-- Sample Data
+-- ============================================
 
--- Allow anonymous inserts (for internal feedback submission)
-CREATE POLICY "Allow anonymous insert" ON public.feedback
-  FOR INSERT
-  WITH CHECK (true);
+INSERT INTO feedback (type, reference, rating, title, description, name, email) VALUES
+('meeting', 'Q1 Planning 2025',  5, 'Very productive session',     'Everyone was aligned and decisions were made quickly.', 'Kesav',  'kesav@company.com'),
+('order',   'ORD-10245',         3, 'Delivery was slightly late',  'Product quality was great but took 3 extra days.',     'Priya',  'priya@company.com'),
+('tour',    'Agra Heritage Tour', 4, 'Great experience overall',   'Guide was knowledgeable. Loved the monuments.',        'Rahul',  'rahul@company.com');
 
--- Allow anonymous read for viewing feedback (internal tool)
-CREATE POLICY "Allow anonymous select" ON public.feedback
-  FOR SELECT
-  USING (true);
+-- ============================================
+-- Useful queries
+-- ============================================
 
--- Create index for faster queries by type
-CREATE INDEX IF NOT EXISTS idx_feedback_type ON public.feedback(feedback_type);
-CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON public.feedback(created_at DESC);
+-- View all feedback
+SELECT * FROM feedback ORDER BY submitted_at DESC;
+
+-- Average rating by type
+SELECT type, ROUND(AVG(rating), 2) AS avg_rating, COUNT(*) AS total
+FROM feedback
+GROUP BY type;
+
+-- Recent feedback (last 7 days)
+SELECT * FROM feedback
+WHERE submitted_at >= NOW() - INTERVAL 7 DAY
+ORDER BY submitted_at DESC;
