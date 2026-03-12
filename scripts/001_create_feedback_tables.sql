@@ -44,3 +44,20 @@ GROUP BY type;
 SELECT * FROM feedback
 WHERE submitted_at >= NOW() - INTERVAL 7 DAY
 ORDER BY submitted_at DESC;
+
+
+/*
+CREATE DATABASE feedme;
+USE feedme;
+
+CREATE TABLE feedback (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  type         ENUM('meeting', 'order', 'tour') NOT NULL,
+  reference    VARCHAR(255),
+  rating       TINYINT CHECK (rating BETWEEN 1 AND 5),
+  title        VARCHAR(255),
+  description  TEXT,
+  name         VARCHAR(255),
+  email        VARCHAR(255),
+  submitted_at DATETIME DEFAULT NOW()
+); */
