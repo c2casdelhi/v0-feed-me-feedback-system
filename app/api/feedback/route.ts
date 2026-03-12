@@ -1,53 +1,55 @@
-import { NextResponse } from "next/server"
-import { neon } from "@neondatabase/serverless"
+// app/api/feedback/route.ts
+// --------------------------------------------
+// 1. Install mysql2 first:
+//    npm install mysql2
+// --------------------------------------------
 
-// Use the direct Postgres URL to bypass PostgREST schema cache issues
-const sql = neon(process.env.POSTGRES_URL!)
+import { NextRequest, NextResponse } from "next/server";
+import mysql from "mysql2/promise";
 
-export async function GET() {
+// DB connection config — put these in .env.local
+const db = mysql.createPool({
+  host:     process.env.DB_HOST     || "localhost",
+  user:     process.env.DB_USER     || "root",
+  password: process.env.DB_PASSWORD || "yourpassword",
+  database: process.env.DB_NAME     || "feedme",
+});
+
+// POST /api/feedback — submit new feedback
+export async function POST(req: NextRequest) {
   try {
-    const feedback = await sql`
-      SELECT * FROM feedback
-      ORDER BY created_at DESC
-      LIMIT 9
-    `
+    const { feedbackType, referenceId, rating, title, description, submitterName, submitterEmail } =
+      await req.json();
 
-    return NextResponse.json({ feedback })
-  } catch (error) {
-    console.error("Error fetching feedback:", error)
-    return NextResponse.json({ error: "Failed to fetch feedback" }, { status: 500 })
+    if (!feedbackType || !rating || !title) {
+      return NextResponse.json(
+        { error: "type, rating, and title are required" },
+        { status: 400 }
+      );
+    }
+
+    const [result]: any = await db.execute(
+      `INSERT INTO feedback (type, reference, rating, title, description, name, email)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [feedbackType, referenceId, rating, title, description, submitterName, submitterEmail]
+    );
+
+    return NextResponse.json({ success: true, id: result.insertId });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 }
 
-export async function POST(request: Request) {
+// GET /api/feedback — fetch all feedback
+export async function GET() {
   try {
-    const body = await request.json()
-    const { feedbackType, referenceId, rating, title, description, submitterName, submitterEmail } = body
-
-    // Validate required fields
-    if (!feedbackType || !referenceId || !rating || !title || !description) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-    }
-
-    // Validate feedback type
-    if (!["meeting", "order", "tour"].includes(feedbackType)) {
-      return NextResponse.json({ error: "Invalid feedback type" }, { status: 400 })
-    }
-
-    // Validate rating
-    if (rating < 1 || rating > 5) {
-      return NextResponse.json({ error: "Rating must be between 1 and 5" }, { status: 400 })
-    }
-
-    const result = await sql`
-      INSERT INTO feedback (feedback_type, reference_id, rating, title, description, submitter_name, submitter_email)
-      VALUES (${feedbackType}, ${referenceId}, ${rating}, ${title}, ${description}, ${submitterName || null}, ${submitterEmail || null})
-      RETURNING *
-    `
-
-    return NextResponse.json({ success: true, feedback: result[0] }, { status: 201 })
-  } catch (error) {
-    console.error("Error inserting feedback:", error)
-    return NextResponse.json({ error: "Failed to submit feedback" }, { status: 500 })
+    const [rows] = await db.execute(
+      "SELECT * FROM feedback ORDER BY submitted_at DESC LIMIT 50"
+    );
+    return NextResponse.json(rows);
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 }
